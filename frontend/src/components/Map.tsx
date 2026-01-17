@@ -51,6 +51,8 @@ interface MapProps {
   centerSelectMode?: boolean;
   onCenterChange?: (coordinates: Coordinates) => void;
   initialCenter?: Coordinates | null;
+  // Fly to this position when it changes (used for GPS recenter)
+  flyToPosition?: Coordinates | null;
   className?: string;
 }
 
@@ -64,6 +66,7 @@ export default function Map({
   centerSelectMode = false,
   onCenterChange,
   initialCenter,
+  flyToPosition,
   className = '',
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -148,6 +151,17 @@ export default function Map({
       map.current?.off('moveend', handleMove);
     };
   }, [centerSelectMode, mapLoaded]);
+
+  // Handle flyToPosition - fly to specified coordinates when prop changes
+  useEffect(() => {
+    if (!map.current || !flyToPosition || !mapLoaded) return;
+
+    map.current.flyTo({
+      center: [flyToPosition.lng, flyToPosition.lat],
+      zoom: 16,
+      duration: 1000,
+    });
+  }, [flyToPosition, mapLoaded]);
 
   // Handle map clicks
   useEffect(() => {
@@ -319,34 +333,38 @@ export default function Map({
     );
   }
 
-  // In centerSelectMode, render map with centered marker overlay
+  // In centerSelectMode, render map with centered pin overlay
   return (
     <div className={`relative w-full h-full ${className}`} style={{ minHeight: '400px' }}>
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* Center marker for location selection mode */}
+      {/* Centered pin marker - always at exact screen center */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-        <div className="relative">
-          {/* Pin icon */}
+        <div className="relative flex flex-col items-center">
+          {/* Pin shadow on ground */}
+          <div
+            className="absolute w-4 h-1.5 bg-black/30 rounded-full blur-sm"
+            style={{ bottom: '-4px' }}
+          />
+          {/* Pin icon - positioned so the point is at center */}
           <svg
             width="40"
-            height="50"
-            viewBox="0 0 40 50"
+            height="52"
+            viewBox="0 0 40 52"
             fill="none"
             className="drop-shadow-lg"
-            style={{ transform: 'translateY(-25px)' }} // Offset so pin point is at center
+            style={{ marginBottom: '-2px' }}
           >
+            {/* Pin body */}
             <path
-              d="M20 0C8.954 0 0 8.954 0 20c0 11.046 20 30 20 30s20-18.954 20-30C40 8.954 31.046 0 20 0z"
+              d="M20 0C8.954 0 0 8.954 0 20c0 14.5 20 32 20 32s20-17.5 20-32C40 8.954 31.046 0 20 0z"
               fill="#3b82f6"
             />
+            {/* Inner circle */}
             <circle cx="20" cy="18" r="8" fill="white" />
+            {/* Center dot */}
+            <circle cx="20" cy="18" r="3" fill="#3b82f6" />
           </svg>
-          {/* Pulsing ring at the point */}
-          <div
-            className="absolute bottom-0 left-1/2 w-3 h-3 -ml-1.5 rounded-full bg-blue-500/30 animate-ping"
-            style={{ transform: 'translateY(-2px)' }}
-          />
         </div>
       </div>
     </div>

@@ -74,10 +74,10 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          {/* <div>
-            <h1 className="text-xl font-bold text-gray-100">MobilityCursor</h1>
-            <p className="text-sm text-gray-500">Report accessibility barriers</p>
-          </div> */}
+          <div>
+            <h1 className="text-xl font-bold text-gray-100">Mobilify</h1>
+            {/* <p className="text-sm text-gray-500">Report accessibility barriers</p> */}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

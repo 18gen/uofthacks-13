@@ -52,8 +52,11 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
   const [file, setFile] = useState<File | null>(null);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
+  const [gpsCoordinates, setGpsCoordinates] = useState<Coordinates | null>(null);
+  const [flyToPosition, setFlyToPosition] = useState<Coordinates | null>(null);
   const [geoMethod, setGeoMethod] = useState<'auto' | 'manual'>('auto');
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [isLoadingGps, setIsLoadingGps] = useState(false);
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +69,11 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     setMediaUrl(null);
     setCoordinates(null);
+    setGpsCoordinates(null);
+    setFlyToPosition(null);
     setGeoMethod('auto');
     setGeoError(null);
+    setIsLoadingGps(false);
     setAnalysis(null);
     setIsAnalyzing(false);
     setError(null);
@@ -127,6 +133,7 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
     try {
       const pos = await getCurrentPosition();
       setCoordinates(pos);
+      setGpsCoordinates(pos);
       setGeoMethod('auto');
       setGeoError(null);
     } catch {
@@ -137,12 +144,30 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
 
   const handleCenterChange = (coords: Coordinates) => {
     setCoordinates(coords);
-    if (geoMethod === 'auto' && geoError === null) {
-      // Keep auto if this is the initial position from geolocation
-    } else {
-      setGeoMethod('manual');
+    // Once user moves the map, mark as manual
+    if (gpsCoordinates) {
+      const distance = Math.abs(coords.lat - gpsCoordinates.lat) + Math.abs(coords.lng - gpsCoordinates.lng);
+      if (distance > 0.0001) {
+        setGeoMethod('manual');
+      }
     }
-    setGeoError(null);
+  };
+
+  const handleRecenterToGps = async () => {
+    setIsLoadingGps(true);
+    try {
+      const pos = await getCurrentPosition();
+      setGpsCoordinates(pos);
+      setCoordinates(pos);
+      setGeoMethod('auto');
+      setGeoError(null);
+      // Trigger map to fly to this position
+      setFlyToPosition({ ...pos });
+    } catch {
+      setGeoError('Could not get your location.');
+    } finally {
+      setIsLoadingGps(false);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -202,6 +227,8 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     setMediaUrl(null);
     setCoordinates(null);
+    setGpsCoordinates(null);
+    setFlyToPosition(null);
     setGeoError(null);
   };
 
@@ -211,35 +238,44 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
   if (step === 'location') {
     return (
       <div className="fixed inset-0 z-50 bg-[#0f0f0f]">
-        {/* Full-screen map */}
+        {/* Full-screen map with centered pin */}
         <div className="absolute inset-0">
           <Map
             reports={[]}
             centerSelectMode={true}
             onCenterChange={handleCenterChange}
             initialCenter={coordinates}
+            flyToPosition={flyToPosition}
           />
         </div>
 
-        {/* Back button - top left */}
-        <button
-          onClick={handleBackFromLocation}
-          className="absolute top-4 left-4 z-20 w-10 h-10 bg-[#1a1a1a] border border-[#333] rounded-full flex items-center justify-center shadow-lg hover:bg-[#262626] transition-colors"
-        >
-          <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        {/* Close button - top right */}
-        {/* <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 z-20 w-10 h-10 bg-[#1a1a1a] border border-[#333] rounded-full flex items-center justify-center shadow-lg hover:bg-[#262626] transition-colors"
-        >
-          <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button> */}
+        <div className='absolute top-4 left-4 z-20'>
+          {/* Back button - top left */}
+          <button
+            onClick={handleBackFromLocation}
+            className="w-10 h-10 bg-[#1a1a1a]/90 backdrop-blur border border-[#333] rounded-full flex items-center justify-center shadow-lg hover:bg-[#262626] transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          {/* GPS recenter button - top right */}
+          <button
+            onClick={handleRecenterToGps}
+            disabled={isLoadingGps}
+            className="top-4 w-10 h-10 bg-[#1a1a1a]/90 backdrop-blur border border-[#333] rounded-full flex items-center justify-center shadow-lg hover:bg-[#262626] transition-colors disabled:opacity-50"
+            title="Recenter to GPS"
+          >
+            {isLoadingGps ? (
+              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {/* Bottom sheet with image preview */}
         <div className="absolute bottom-0 left-0 right-0 z-20">
@@ -274,7 +310,7 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-gray-100 font-semibold text-sm sm:text-base">Set barrier location</h3>
+                  <h3 className="text-gray-100 font-semibold text-sm sm:text-base">Confirm barrier location</h3>
                   <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
                     Pan the map to position the pin
                   </p>
@@ -305,30 +341,22 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
     );
   }
 
-  // Regular modal for other steps
+  // Floating modal for other steps (no header bar)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-[#333] flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-100">
-            {step === 'select' && 'Report Barrier'}
-            {step === 'converting' && 'Processing...'}
-            {step === 'analyzing' && 'Analyzing...'}
-            {step === 'review' && 'Review Report'}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors p-1"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+      <div className="relative bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Floating close button - top right */}
+        <button
+          onClick={handleClose}
+          className="absolute top-3 right-3 z-10 w-8 h-8 bg-[#262626] hover:bg-[#333] rounded-full flex items-center justify-center transition-colors"
+        >
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
           {error && (
             <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
               {error}
@@ -338,9 +366,12 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
           {/* Step 1: File Selection */}
           {step === 'select' && (
             <div className="space-y-4">
-              <p className="text-gray-400 text-sm sm:text-base">
-                Upload a photo or video of the accessibility barrier.
-              </p>
+              <div className="pr-8">
+                <h2 className="text-xl font-semibold text-gray-100 mb-1">Report Barrier</h2>
+                <p className="text-gray-500 text-sm">
+                  Upload a photo or video of the accessibility barrier.
+                </p>
+              </div>
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-[#404040] rounded-xl p-8 sm:p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-colors"
@@ -393,6 +424,10 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
           {/* Step 4: Review */}
           {step === 'review' && analysis && (
             <div className="space-y-4">
+              <div className="pr-8">
+                <h2 className="text-xl font-semibold text-gray-100 mb-1">Review Report</h2>
+              </div>
+
               {mediaUrl && file && (
                 <div className="rounded-xl overflow-hidden bg-[#262626]">
                   {file.type.startsWith('image/') ? (
@@ -444,7 +479,7 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
 
         {/* Footer */}
         {(step === 'select' || step === 'review') && (
-          <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-[#333] bg-[#141414]">
+          <div className="px-5 py-4 sm:px-6 border-t border-[#333] bg-[#141414]">
             {step === 'select' && (
               <button
                 onClick={handleClose}
