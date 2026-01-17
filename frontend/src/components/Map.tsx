@@ -77,10 +77,12 @@ export default function Map({
   const markersData = useRef<globalThis.Map<string, MarkerData>>(new globalThis.Map());
   const clickMarker = useRef<mapboxgl.Marker | null>(null);
   const hoverPopup = useRef<mapboxgl.Popup | null>(null);
+  const allPopups = useRef<mapboxgl.Popup[]>([]);
   const onPinClickRef = useRef(onPinClick);
   const onCenterChangeRef = useRef(onCenterChange);
   const reportsRef = useRef(reports);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [showAllPopups, setShowAllPopups] = useState(false);
 
   // Keep onCenterChange ref updated
   useEffect(() => {
@@ -369,14 +371,58 @@ export default function Map({
     }
   }, [selectedReportId, reports]);
 
-  // If not in centerSelectMode, render simple map container
+  // Handle showing/hiding all popups
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Remove all existing popups
+    allPopups.current.forEach((popup) => popup.remove());
+    allPopups.current = [];
+
+    if (showAllPopups) {
+      // Create popups for all reports
+      reports.forEach((report) => {
+        const popup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 20,
+          className: 'report-hover-popup',
+        })
+          .setLngLat([report.coordinates.lng, report.coordinates.lat])
+          .setHTML(createPopupContent(report))
+          .addTo(map.current!);
+        allPopups.current.push(popup);
+      });
+    }
+  }, [showAllPopups, reports, mapLoaded]);
+
+  // Clean up all popups on unmount
+  useEffect(() => {
+    return () => {
+      allPopups.current.forEach((popup) => popup.remove());
+    };
+  }, []);
+
+  // If not in centerSelectMode, render map with show all button
   if (!centerSelectMode) {
     return (
-      <div
-        ref={mapContainer}
-        className={`w-full h-full ${className}`}
-        style={{ minHeight: '400px' }}
-      />
+      <div className={`relative w-full h-full ${className}`} style={{ minHeight: '400px' }}>
+        <div ref={mapContainer} className="w-full h-full" />
+
+        {/* Show All Popups button - only when there are reports */}
+        {reports.length > 0 && (
+          <button
+            onClick={() => setShowAllPopups(!showAllPopups)}
+            className={`absolute top-4 right-16 z-10 px-3 py-2 rounded-lg font-medium text-sm shadow-lg transition-colors ${
+              showAllPopups
+                ? 'bg-blue-600 text-white'
+                : 'bg-[#1a1a1a]/90 backdrop-blur border border-[#333] text-gray-200 hover:bg-[#262626]'
+            }`}
+          >
+            {showAllPopups ? 'Hide Info' : 'Show All'}
+          </button>
+        )}
+      </div>
     );
   }
 
