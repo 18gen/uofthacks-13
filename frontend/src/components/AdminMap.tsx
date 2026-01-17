@@ -49,8 +49,8 @@ interface AdminMapProps {
   areas: AdminArea[];
   selectedAreaId: string | null;
   highlightedReportIds: string[];
-  onAreaCreated: (geometry: GeoJSON.Polygon) => void;
-  onAreaDeleted: (areaId: string) => void;
+  onAreaCreated: (geometry: GeoJSON.Polygon) => void | Promise<void>;
+  onAreaDeleted: (areaId: string) => void | Promise<void>;
   onPinClick?: (report: Report) => void;
   className?: string;
 }

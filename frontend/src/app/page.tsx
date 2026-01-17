@@ -38,16 +38,20 @@ export default function HomePage() {
   };
 
   const handleReportSubmit = useCallback(
-    (reportData: Omit<Report, 'id' | 'createdAt'>) => {
-      const newReport = addReport(reportData);
-      analytics.reportSubmitted(
-        newReport.id,
-        newReport.analysis.category,
-        newReport.analysis.severity,
-        newReport.mediaType,
-        newReport.geoMethod
-      );
-      addToast('Report submitted successfully!', 'success');
+    async (reportData: Omit<Report, 'id' | 'createdAt'>) => {
+      const newReport = await addReport(reportData);
+      if (newReport) {
+        analytics.reportSubmitted(
+          newReport.id,
+          newReport.analysis.category,
+          newReport.analysis.severity,
+          newReport.mediaType,
+          newReport.geoMethod
+        );
+        addToast('Report submitted successfully!', 'success');
+      } else {
+        addToast('Failed to submit report. Please try again.', 'error');
+      }
     },
     [addReport, addToast]
   );

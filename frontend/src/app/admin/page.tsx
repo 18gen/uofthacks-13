@@ -65,11 +65,15 @@ export default function AdminPage() {
   }, [selectedAreaId, areas, reports]);
 
   const handleAreaCreated = useCallback(
-    (geometry: GeoJSON.Polygon) => {
+    async (geometry: GeoJSON.Polygon) => {
       const areaNumber = areas.length + 1;
-      const newArea = addArea(geometry, `Area ${areaNumber}`);
-      analytics.adminAreaSaved(newArea.id);
-      addToast('Responsibility area created', 'success');
+      const newArea = await addArea(geometry, `Area ${areaNumber}`);
+      if (newArea) {
+        analytics.adminAreaSaved(newArea.id);
+        addToast('Responsibility area created', 'success');
+      } else {
+        addToast('Failed to create area', 'error');
+      }
     },
     [areas.length, addArea, addToast]
   );

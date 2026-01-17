@@ -44,7 +44,7 @@ async function convertHeicToJpeg(file: File): Promise<{ blob: Blob; file: File }
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (report: Omit<Report, 'id' | 'createdAt'>) => void;
+  onSubmit: (report: Omit<Report, 'id' | 'createdAt'>) => void | Promise<void>;
 }
 
 export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalProps) {
@@ -201,12 +201,27 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!file || !mediaUrl || !coordinates || !analysis) return;
+
+    // Convert blob URL to base64 data URL so it persists in localStorage
+    let persistentMediaUrl = mediaUrl;
+    try {
+      const response = await fetch(mediaUrl);
+      const blob = await response.blob();
+      persistentMediaUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      // If conversion fails, use original URL (won't persist but at least works for session)
+      console.warn('Failed to convert media to base64');
+    }
 
     const report: Omit<Report, 'id' | 'createdAt'> = {
       coordinates,
-      mediaUrl,
+      mediaUrl: persistentMediaUrl,
       mediaType: file.type.startsWith('image/') ? 'image' : 'video',
       fileName: file.name,
       fileSize: file.size,
@@ -214,7 +229,7 @@ export default function UploadModal({ isOpen, onClose, onSubmit }: UploadModalPr
       geoMethod,
     };
 
-    onSubmit(report);
+    await onSubmit(report);
     resetState();
     onClose();
   };
